@@ -1,0 +1,28 @@
+{
+  "name": "steff-schedule-importer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@google/genai": "^1.10.0",
+    "@googleapis/calendar": "^9.7.1",
+    "nuxt": "^3.13.0"
+  },
+  "devDependencies": {
+    "@nuxt/typescript-build": "^3.0.2",
+    "typescript": "^5.5.4",
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.3"
+  }
+}
