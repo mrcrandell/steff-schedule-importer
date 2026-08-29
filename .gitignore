@@ -1,5 +1,6 @@
 .env
 .output
 .nuxt
+.vercel
 node_modules
 dist

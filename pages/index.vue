@@ -92,6 +92,7 @@
         {{ syncMessage }}
       </p>
     </section>
+
   </main>
 </template>
 
@@ -104,6 +105,35 @@ interface NormalizedShift {
   endISO: string
   startWasRounded: boolean
 }
+
+interface GoogleTokenResponse {
+  access_token?: string
+  error?: string
+  error_description?: string
+}
+
+interface GoogleTokenClient {
+  callback: ((response: GoogleTokenResponse) => void) | null
+  requestAccessToken: (options?: { prompt?: string }) => void
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        oauth2?: {
+          initTokenClient: (options: {
+            client_id: string
+            scope: string
+            callback: (response: GoogleTokenResponse) => void
+          }) => GoogleTokenClient
+        }
+      }
+    }
+  }
+}
+
+const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
@@ -118,6 +148,20 @@ const syncHasError = ref(false)
 // This is intentionally NOT stored in localStorage or on window to reduce
 // the attack surface for token theft.
 const googleAccessToken = ref('')
+const runtimeConfig = useRuntimeConfig()
+const googleClientId = runtimeConfig.public.googleClientId
+let googleTokenClient: GoogleTokenClient | null = null
+let googleScriptPromise: Promise<void> | null = null
+
+useHead({
+  script: [
+    {
+      src: 'https://accounts.google.com/gsi/client',
+      async: true,
+      defer: true,
+    },
+  ],
+})
 
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -180,17 +224,11 @@ async function syncToCalendar() {
   syncMessage.value = ''
   syncHasError.value = false
 
-  // NOTE: A real implementation would trigger the Google OAuth consent flow
-  // (redirect or popup) to obtain the access token before calling this endpoint.
-  if (!googleAccessToken.value) {
-    syncMessage.value =
-      'Google OAuth is not yet configured. Please complete the OAuth flow to obtain an access token.'
-    syncHasError.value = true
-    isSyncing.value = false
-    return
-  }
-
   try {
+    if (!googleAccessToken.value) {
+      googleAccessToken.value = await requestGoogleAccessToken()
+    }
+
     await $fetch('/api/sync-calendar', {
       method: 'POST',
       body: {
@@ -201,12 +239,89 @@ async function syncToCalendar() {
     })
     syncMessage.value = `Successfully synced ${shifts.value.length} shift(s) to Google Calendar!`
   } catch (err: unknown) {
+    googleAccessToken.value = ''
     syncHasError.value = true
     syncMessage.value =
       err instanceof Error ? err.message : 'An unexpected error occurred while syncing to Google Calendar.'
   } finally {
     isSyncing.value = false
   }
+}
+
+async function requestGoogleAccessToken(): Promise<string> {
+  if (!googleClientId) {
+    throw new Error('GOOGLE_CLIENT_ID is not available to the browser. Restart the app after updating .env.')
+  }
+
+  await ensureGoogleIdentityScript()
+
+  if (!window.google?.accounts?.oauth2) {
+    throw new Error('Google Identity Services failed to load.')
+  }
+
+  if (!googleTokenClient) {
+    googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: googleClientId,
+      scope: GOOGLE_CALENDAR_SCOPE,
+      callback: () => {},
+    })
+  }
+
+  return await new Promise<string>((resolve, reject) => {
+    if (!googleTokenClient) {
+      reject(new Error('Google OAuth client could not be initialized.'))
+      return
+    }
+
+    googleTokenClient.callback = (response) => {
+      if (response.error) {
+        reject(new Error(response.error_description || response.error))
+        return
+      }
+
+      if (!response.access_token) {
+        reject(new Error('Google OAuth did not return an access token.'))
+        return
+      }
+
+      resolve(response.access_token)
+    }
+
+    googleTokenClient.requestAccessToken({
+      prompt: googleAccessToken.value ? '' : 'consent',
+    })
+  })
+}
+
+async function ensureGoogleIdentityScript(): Promise<void> {
+  if (window.google?.accounts?.oauth2) {
+    return
+  }
+
+  if (!googleScriptPromise) {
+    googleScriptPromise = new Promise<void>((resolve, reject) => {
+      const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]')
+
+      const onLoad = () => resolve()
+      const onError = () => reject(new Error('Failed to load Google Identity Services.'))
+
+      if (existingScript) {
+        existingScript.addEventListener('load', onLoad, { once: true })
+        existingScript.addEventListener('error', onError, { once: true })
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.defer = true
+      script.addEventListener('load', onLoad, { once: true })
+      script.addEventListener('error', onError, { once: true })
+      document.head.appendChild(script)
+    })
+  }
+
+  await googleScriptPromise
 }
 
 /** Format an ISO local datetime to a human-readable time string */
@@ -417,4 +532,5 @@ tr:last-child td {
 .cell--center {
   text-align: center;
 }
+
 </style>
