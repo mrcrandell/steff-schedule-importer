@@ -46,7 +46,7 @@ pnpm dev
 
 ## Required credentials
 
-The server reads these values from `runtimeConfig` in `nuxt.config.ts`:
+The server reads these values from `runtimeConfig` in [nuxt.config.ts](./nuxt.config.ts):
 
 - `GEMINI_API_KEY`
 - `GOOGLE_CLIENT_ID`
@@ -59,7 +59,7 @@ This is required for `/api/parse-schedule`.
 
 How to get it:
 
-1. Go to Google AI Studio: `https://aistudio.google.com/`
+1. Go to Google AI Studio: [https://aistudio.google.com/](https://aistudio.google.com/)
 2. Sign in with your Google account.
 3. Create or open a project.
 4. Generate an API key.
@@ -71,7 +71,7 @@ These are required for `/api/sync-calendar`.
 
 How to get them:
 
-1. Go to Google Cloud Console: `https://console.cloud.google.com/`
+1. Go to Google Cloud Console: [https://console.cloud.google.com/](https://console.cloud.google.com/)
 2. Create a project or select an existing one.
 3. Open `APIs & Services`.
 4. Enable the `Google Calendar API` for that project.
@@ -101,9 +101,9 @@ That means:
 
 In code:
 
-- `server/api/parse-schedule.post.ts` uses `GEMINI_API_KEY`.
-- `server/api/sync-calendar.post.ts` expects a client-supplied Google access token and uses the configured OAuth client credentials.
-- `pages/index.vue` currently contains a placeholder note where the OAuth flow should be implemented.
+- [server/api/parse-schedule.post.ts](./server/api/parse-schedule.post.ts) uses `GEMINI_API_KEY`.
+- [server/api/sync-calendar.post.ts](./server/api/sync-calendar.post.ts) expects a client-supplied Google access token and uses the configured OAuth client credentials.
+- [pages/index.vue](./pages/index.vue) currently contains a placeholder note where the OAuth flow should be implemented.
 
 ## Verifying local setup
 
